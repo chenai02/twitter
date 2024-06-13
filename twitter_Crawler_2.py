@@ -159,8 +159,8 @@ if __name__ == "__main__":
                     save_dir = os.path.join('image/', twitter_user)
                     if not content_queue.contains(tweet_text):
                         content_queue.enqueue(tweet_text)
-                    if image_urls:
-                        download_images(image_urls, save_dir)
+                        if image_urls:
+                            download_images(image_urls, save_dir)
                 except TimeoutException:
                     print("Loading the page timed out.")
                     time.sleep(2)
