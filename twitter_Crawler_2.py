@@ -1,174 +1,116 @@
 import json
 import time
-import logging
-import requests
-import aiohttp
-import asyncio
 from FixedSizeQueue import FixedSizeQueue
 from download_pic import *
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver import ChromeOptions
-from selenium.common.exceptions import TimeoutException
 from bs4 import BeautifulSoup
 from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchWindowException
+import requests
+from PIL import Image
+from io import BytesIO
 
 
-def download_new(name):
-    while len(driver.find_elements(By.CSS_SELECTOR, "div[data-testid='tweetText']")):
-        try:
-            for data in driver.find_elements(
-                By.CSS_SELECTOR, "div[data-testid='tweetText']"
-            )[0:7]:
-                # print(len(driver.find_elements(By.CSS_SELECTOR, "div[data-testid='cellInnerDiv']")))
-                # print(len(data.find_elements(By.TAG_NAME, "img")))    # 调试时使用
-                for img in data.find_elements(By.TAG_NAME, "img"):
-                    src = img.get_attribute("src")
-                    if "profile_images" not in src and "media" in src:
-                        string_list.append(
-                            src[: src.find("?")] + "?format=png&name=large"
-                        )  # &name=large
-                driver.execute_script(
-                    """
-                    var dataElements = document.querySelectorAll("div[data-testid='cellInnerDiv']");
-                    if(dataElements.length > 0) {
-                        dataElements[0].remove();
-                    }
-                    """
-                )
-                time.sleep(0.5)
-                if (
-                    len(
-                        driver.find_elements(
-                            By.CSS_SELECTOR, "div[data-testid='cellInnerDiv']"
-                        )
-                    )
-                    == 0
-                ):
-                    time.sleep(2)
-                print("next", end=" ")
-        except BaseException as error:
-            print("what?")
-            print(str(error))
-            continue
-    print("")
-    get_url_pic(string_list, len(string_list), name)
-    print(f"共下载{len(string_list)}张图片")
-
-async def download_image(session, url, save_directory, file_name=None):
-    """
-    异步下载图片并保存到指定目录。
-    
-    :param session: aiohttp 客户端会话
-    :param url: 图片的 URL
-    :param save_directory: 保存图片的目录
-    :param file_name: 保存图片的文件名，如果未指定则使用 URL 中的文件名
-    """
+def download_image(url, save_path):
     try:
-        async with session.get(url) as response:
-            response.raise_for_status()  # 如果请求失败则抛出异常
-            
-            # 获取图片的文件名
-            if not file_name:
-                file_name = os.path.basename(url)
-            
-            # 确保保存目录存在
-            if not os.path.exists(save_directory):
-                os.makedirs(save_directory)
-            
-            # 拼接保存路径
-            save_path = os.path.join(save_directory, file_name)
-            
-            # 将图片内容写入文件
-            with open(save_path, 'wb') as file:
-                file.write(await response.read())
-            
-            print(f"图片已成功下载并保存到: {save_path}")
-    
-    except aiohttp.ClientError as e:
-        print(f"下载图片时发生错误: {e}")
+        # 发送HTTP请求
+        response = requests.get(url)
+        response.raise_for_status()  # 检查请求是否成功
+
+        # 读取图片数据
+        image_data = response.content
+
+        # 打开图片
+        image = Image.open(BytesIO(image_data))
+
+        # 保存图片
+        image.save(save_path)
+        print(f"Image successfully downloaded and saved to {save_path}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error downloading the image from {url}: {e}")
+    except IOError as e:
+        print(f"Error saving the image: {e}")
 
 
-async def async_task(image_urls, save_directory):
-    """
-    异步下载多张图片。
-    
-    :param image_urls: 图片 URL 列表
-    :param save_directory: 保存图片的目录
-    """
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        for url in image_urls:
-            tasks.append(download_image(session, url, save_directory))
-        
-        await asyncio.gather(*tasks)
+def download_images(urls, save_directory):
+    # 确保保存目录存在
+    if not os.path.exists(save_directory):
+        os.makedirs(save_directory)
 
-def crash_new(name):
-        try:
-            tweets = driver.find_elements(By.CSS_SELECTOR, "article")
-            if len(tweets) == 0:
-                return '', -1, []
-            # 解析目标推文
-            for tweet in tweets:
-                soup = BeautifulSoup(tweet.get_attribute("innerHTML"), "html.parser")
+    for i, url in enumerate(urls):
+        save_path = os.path.join(save_directory, f"image_{i + 1}.jpg")
+        download_image(url, save_path)
 
-                # 获取用户名
-                username = soup.find("div", {"dir": "ltr"}).get_text()
 
-                # 获取日期
-                date = soup.find("time")["datetime"]
+def crash_new():
+    tweet_text, date, image_urls = '', -1, []
+    try:
+        tweets = driver.find_elements(By.CSS_SELECTOR, "article")
+        if len(tweets) == 0:
+            return '', -1, []
+        # 解析目标推文
+        for tweet in tweets:
+            soup = BeautifulSoup(tweet.get_attribute("innerHTML"), "html.parser")
 
-                # 获取推文内容
-                tweet_text = soup.find("div", {"data-testid": "tweetText"}).get_text()
+            # 获取用户名
+            username = soup.find("div", {"dir": "ltr"}).get_text()
 
-                # 获取视频时长（假设有视频）
-                video_duration = (
-                    soup.find("span", {"data-testid": "videoDuration"}).get_text()
-                    if soup.find("span", {"data-testid": "videoDuration"})
-                    else None
-                )
+            # 获取日期
+            date = soup.find("time")["datetime"]
 
-                # 获取互动数据
-                engagements = soup.find_all(
-                    "span", {"data-testid": "app-text-transition-container"}
-                )
-                comments = engagements[0].get_text() if len(engagements) > 0 else "0"
-                retweets = engagements[1].get_text() if len(engagements) > 1 else "0"
-                likes = engagements[2].get_text() if len(engagements) > 2 else "0"
-                views = engagements[3].get_text() if len(engagements) > 3 else "0"
+            # 获取推文内容
+            tweet_text = soup.find("div", {"data-testid": "tweetText"}).get_text()
 
-                # 获取图片URL
-                image_urls = []
-                image_elements = soup.find_all("img", {"alt": "Image"})
-                for image_element in image_elements:
-                    src = image_element.attrs.get("src", None)
-                    if src:
-                        image_urls.append(src)
+            # 获取视频时长（假设有视频）
+            video_duration = (
+                soup.find("span", {"data-testid": "videoDuration"}).get_text()
+                if soup.find("span", {"data-testid": "videoDuration"})
+                else None
+            )
 
-                # 打印结果
-                logging.debug(f"用户名: {username}")
-                logging.debug(f"日期: {date}")
-                logging.debug(f"推文内容: {tweet_text}")
-                if video_duration:
-                    logging.debug(f"视频时长: {video_duration}")
-                logging.debug(f"评论数: {comments}")
-                logging.debug(f"转推数: {retweets}")
-                logging.debug(f"点赞数: {likes}")
-                logging.debug(f"观看数: {views}")
-                if image_urls:
-                    logging.debug("图片URL:")
-                    for url in image_urls:
-                        logging.debug(url)
+            # 获取互动数据
+            engagements = soup.find_all(
+                "span", {"data-testid": "app-text-transition-container"}
+            )
+            comments = engagements[0].get_text() if len(engagements) > 0 else "0"
+            retweets = engagements[1].get_text() if len(engagements) > 1 else "0"
+            likes = engagements[2].get_text() if len(engagements) > 2 else "0"
+            views = engagements[3].get_text() if len(engagements) > 3 else "0"
 
-                logging.debug("-" * 40)
-                return tweet_text, date, image_urls
-        except NoSuchWindowException as error:
-            logging.error("No such window: target window already closed.", exc_info=True)
-            return '', -2, [] 
-        except WebDriverException as error:
-            logging.error("WebDriverException occurred.", exc_info=True)
-        finally:
-           return '', -1, [] 
+            # 获取图片URL
+            image_elements = soup.find_all("img", {"alt": "Image"})
+            for image_element in image_elements:
+                src = image_element.attrs.get("src", None)
+                if src:
+                    image_urls.append(src)
+
+            # 打印结果
+            print(f"用户名: {username}")
+            print(f"日期: {date}")
+            print(f"推文内容: {tweet_text}")
+            if video_duration:
+                print(f"视频时长: {video_duration}")
+            print(f"评论数: {comments}")
+            print(f"转推数: {retweets}")
+            print(f"点赞数: {likes}")
+            print(f"观看数: {views}")
+            if image_urls:
+                print("图片URL:")
+                for url in image_urls:
+                    print(url)
+
+            print("-" * 40)
+            return tweet_text, date, image_urls
+    except NoSuchWindowException:
+        print("No such window: target window already closed.")
+        return '', -2, []
+    except WebDriverException:
+        print("WebDriverException occurred.")
+    finally:
+        return tweet_text, date, image_urls
+
 
 if __name__ == "__main__":
     # 初始化
@@ -193,13 +135,13 @@ if __name__ == "__main__":
 
     # 创建队列
     content_queue = FixedSizeQueue(100)
-    logging.debug("访问推特页面中.....")
+    print("访问推特页面中.....")
     try:
         with open("./twitterUrl.txt", "r", encoding="utf-8") as file:
             for line in file:
                 try:
                     driver.get(line)
-                    logging.debug("准备爬取推文中.....")
+                    print("准备爬取推文中.....")
                     time.sleep(4)
                     name = driver.find_elements(
                         By.XPATH,
@@ -209,27 +151,27 @@ if __name__ == "__main__":
                         continue
 
                     twitter_user = name[0].text
-                    tweet_text, date, image_urls = crash_new(twitter_user)
+                    tweet_text, date, image_urls = crash_new()
                     if date == -1:
                         continue
                     elif date == -2:
-                        break 
-                    save_dir = os.path.join('./image/', twitter_user)
+                        break
+                    save_dir = os.path.join('image/', twitter_user)
                     if not content_queue.contains(tweet_text):
                         content_queue.enqueue(tweet_text)
-                    asyncio.run(async_task(image_urls, save_dir))
-
+                    if image_urls:
+                        download_images(image_urls, save_dir)
                 except TimeoutException:
-                    logging.error("Loading the page timed out.")
+                    print("Loading the page timed out.")
                     time.sleep(2)
                 except NoSuchWindowException:
-                    logging.error("The target window is already closed.")
+                    print("The target window is already closed.")
                     break
                 except WebDriverException as e:
-                    logging.error(f"WebDriverException occurred: {e}", exc_info=True)  
-                    break 
+                    print(f"WebDriverException occurred: {e}")
+                    break
                 except Exception as e:
-                    logging.error(f"other error: {e.message}") 
+                    print(f"other error: {e}")
                     time.sleep(2)
     except BaseException as error:
-        logging.error("open file has a error, ", str(error))
+        print("open file has a error, ", str(error))
