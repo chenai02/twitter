@@ -10,7 +10,7 @@ from selenium.common.exceptions import TimeoutException, WebDriverException, NoS
 import requests
 from PIL import Image
 from io import BytesIO
-
+from datetime import datetime
 
 def download_image(url, save_path):
     try:
@@ -39,36 +39,42 @@ def download_images(urls, save_directory):
     if not os.path.exists(save_directory):
         os.makedirs(save_directory)
 
+    count = 0
+    save_path = os.path.join(save_directory, f"image_{count}.jpg")
+
     for i, url in enumerate(urls):
-        save_path = os.path.join(save_directory, f"image_{i + 1}.jpg")
+        while os.path.exists(save_path):
+            save_path = os.path.join(save_directory, f"image_{count + 1}.jpg")
+            count += 1
         download_image(url, save_path)
 
 
-def crash_new():
-    tweet_text, date, image_urls = '', -1, []
+def crash_new(twitter_user, content_queue, count):
+    tweet_text, date, image_urls, uuid = '', '-1', [], ''
     try:
         tweets = driver.find_elements(By.CSS_SELECTOR, "article")
+
         if len(tweets) == 0:
             return '', -1, []
+        elif len(tweets) >= 10:
+            tweets = tweets[:10]
         # 解析目标推文
         for tweet in tweets:
             soup = BeautifulSoup(tweet.get_attribute("innerHTML"), "html.parser")
 
-            # 获取用户名
-            username = soup.find("div", {"dir": "ltr"}).get_text()
 
             # 获取日期
-            date = soup.find("time")["datetime"]
+            date = datetime.fromisoformat(soup.find("time")["datetime"].replace("Z", "+00:00")).strftime('%Y%m%d%H%M%S')
 
+            # 生成唯一ID
+            uuid = twitter_user + '_' + date
+
+            if content_queue.contains(uuid):
+                date = '-1'
+                time.sleep(10)
+                return tweet_text, date, image_urls, uuid
             # 获取推文内容
             tweet_text = soup.find("div", {"data-testid": "tweetText"}).get_text()
-
-            # 获取视频时长（假设有视频）
-            video_duration = (
-                soup.find("span", {"data-testid": "videoDuration"}).get_text()
-                if soup.find("span", {"data-testid": "videoDuration"})
-                else None
-            )
 
             # 获取互动数据
             engagements = soup.find_all(
@@ -87,11 +93,8 @@ def crash_new():
                     image_urls.append(src)
 
             # 打印结果
-            print(f"用户名: {username}")
             print(f"日期: {date}")
             print(f"推文内容: {tweet_text}")
-            if video_duration:
-                print(f"视频时长: {video_duration}")
             print(f"评论数: {comments}")
             print(f"转推数: {retweets}")
             print(f"点赞数: {likes}")
@@ -102,14 +105,22 @@ def crash_new():
                     print(url)
 
             print("-" * 40)
-            return tweet_text, date, image_urls
+
+            save_dir = os.path.join('image/', uuid)
+            if image_urls:
+                download_images(image_urls, save_dir)
+            content_queue.enqueue(uuid)
+            time.sleep(10)
+            if count == 0:
+                return tweet_text, date, image_urls, uuid
     except NoSuchWindowException:
         print("No such window: target window already closed.")
-        return '', -2, []
+        return '', '-2', [], uuid
     except WebDriverException:
         print("WebDriverException occurred.")
+        return '', '-2', [], uuid
     finally:
-        return tweet_text, date, image_urls
+        return tweet_text, date, image_urls, uuid
 
 
 if __name__ == "__main__":
@@ -136,42 +147,47 @@ if __name__ == "__main__":
     # 创建队列
     content_queue = FixedSizeQueue(100)
     print("访问推特页面中.....")
-    try:
-        with open("./twitterUrl.txt", "r", encoding="utf-8") as file:
-            for line in file:
-                try:
-                    driver.get(line)
-                    print("准备爬取推文中.....")
-                    time.sleep(4)
-                    name = driver.find_elements(
-                        By.XPATH,
-                        '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div/div/div[3]/div/div/div/div/div[2]/div[1]/div/div[1]/div/div/span/span[1]',
-                    )
-                    if not name[0].text:
-                        continue
+    # 第一次爬取时，只需要爬一条消息
+    count = 0
+    while True:
+        try:
+            with open("./twitterUrl.txt", "r", encoding="utf-8") as file:
+                for line in file:
+                    try:
+                        # 去除首尾空白字符
+                        line = line.strip()
+                        if not line:
+                            continue
+                        driver.get(line)
+                        print("准备爬取推文中.....")
+                        time.sleep(15)
+                        name = driver.find_elements(
+                            By.XPATH,
+                            '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div/div/div[3]/div/div/div/div/div[2]/div[1]/div/div[1]/div/div/span/span[1]',
+                        )
+                        if not name[0].text:
+                            continue
 
-                    twitter_user = name[0].text
-                    tweet_text, date, image_urls = crash_new()
-                    if date == -1:
-                        continue
-                    elif date == -2:
+                        twitter_user = name[0].text
+                        tweet_text, date, image_urls, uuid = crash_new(twitter_user, content_queue, count)
+                        if date == '-1':
+                            continue
+                        elif date == '-2':
+                            break
+                    except TimeoutException:
+                        print("Loading the page timed out.")
+                        time.sleep(10)
+                    except NoSuchWindowException:
+                        print("The target window is already closed.")
                         break
-                    save_dir = os.path.join('image/', twitter_user)
-                    if not content_queue.contains(tweet_text):
-                        content_queue.enqueue(tweet_text)
-                        if image_urls:
-                            download_images(image_urls, save_dir)
-                except TimeoutException:
-                    print("Loading the page timed out.")
-                    time.sleep(2)
-                except NoSuchWindowException:
-                    print("The target window is already closed.")
-                    break
-                except WebDriverException as e:
-                    print(f"WebDriverException occurred: {e}")
-                    break
-                except Exception as e:
-                    print(f"other error: {e}")
-                    time.sleep(2)
-    except BaseException as error:
-        print("open file has a error, ", str(error))
+                    except WebDriverException as e:
+                        print(f"WebDriverException occurred: {e}")
+                        time.sleep(10)
+                        continue
+                    except Exception as e:
+                        print(f"other error: {e}")
+                        time.sleep(10)
+        except BaseException as error:
+            print("open file has a error, ", str(error))
+        count = 1
+        time.sleep(8000)
