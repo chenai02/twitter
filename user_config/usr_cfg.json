@@ -1,0 +1,16 @@
+{
+  "Twitte_Usr" : {
+    "https://twitter.com/elonmusk" : "马斯克",
+    "https://twitter.com/Tesla" : "特斯拉",
+    "https://twitter.com/neuralink" :"脑机接口技-马斯克",
+    "https://twitter.com/OpenAI" : "OpenAI",
+    "https://twitter.com/xai" : "xAI",
+    "https://twitter.com/Starlink" : "星链",
+    "https://twitter.com/SpaceX" : "SpaceX",
+    "https://twitter.com/cybertruck" : "cybertruck",
+    "https://twitter.com/Tesla_Optimus" : "特斯拉人形机器人",
+    "https://twitter.com/Figure_robot" : "Figure_robot",
+    "https://twitter.com/ReutersBiz" : "路透社",
+    "https://twitter.com/mingchikuo" : "郭明錤"
+  }
+}

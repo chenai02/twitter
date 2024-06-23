@@ -27,16 +27,6 @@ class FixedSizeQueue:
     def size(self):
         return len(self.queue)
 
-    def contains(self, item):
-        """检查队列中是否包含某个元素。
-        
-        Args:
-            item: 要检查的元素，可以是队列存储的任何类型。
-
-        Returns:
-            bool: 如果队列包含该元素则返回True，否则返回False。
-        """
-        return any(queued_item == item for queued_item in self.queue)
     
     def printQ(self):
         """以更易读的方式打印队列中的所有元素。"""
