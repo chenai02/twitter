@@ -10,10 +10,12 @@ from selenium.common.exceptions import TimeoutException, WebDriverException, NoS
 import requests
 from PIL import Image
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from dingtalkchatbot.chatbot import DingtalkChatbot
 from src.Myfeishu import *
 from src.BaseData import *
+import pytz
+from src.myMQ import *
 
 
 def load_config(config_path):
@@ -63,7 +65,7 @@ def download_images(urls, save_directory):
         download_image(url, save_path)
 
 
-def crash_new(url, twitter_user, content_queue, count):
+def crash_new(url, twitter_user, content_queue, count, mq, currentTime):
     tweet_text, date, image_urls, uuid = '', '-1', [], ''
     try:
         tweets = driver.find_elements(By.CSS_SELECTOR, "article")
@@ -74,14 +76,19 @@ def crash_new(url, twitter_user, content_queue, count):
         # 解析目标推文
         for tweet in tweets:
             soup = BeautifulSoup(tweet.get_attribute("innerHTML"), "html.parser")
-
-
             # 获取日期
-            date = datetime.fromisoformat(soup.find("time")["datetime"].replace("Z", "+00:00")).strftime('%Y%m%d-%H:%M:%S')
+            print(soup.find("time")["datetime"])
+            dt = datetime.strptime(soup.find("time")["datetime"], "%Y-%m-%dT%H:%M:%S.%fZ")
+            # 设置为UTC时区
+            dt = dt.replace(tzinfo=pytz.UTC)
+            # 转换为中国时区
+            dt = dt.astimezone(pytz.timezone("Asia/Shanghai"))
+            if currentTime > dt:
+                return
 
+            date = dt.strftime("%Y-%m-%d %H:%M:%S")
             # 生成唯一ID
-            uuid = twitter_user + '_' + date
-
+            uuid = (str(twitter_user) + '_' + date).replace(" ", "")
             if content_queue.contains(uuid):
                 date = '-1'
                 return tweet_text, date, image_urls, uuid
@@ -115,9 +122,26 @@ def crash_new(url, twitter_user, content_queue, count):
             except Exception as e:
                 usr = ""
             mess = f"{date}  " + f"{url.split('/')[-1]}:" + f"{tweet_text}"
+            print(mess)
+            content_queue.enqueue(uuid)
+            print(uuid)
+            if "Reuters Business" in uuid:
+                content_queue.printQ(debug=True)
             dingtalk5(mess)
             mess = MessageData(CONFIG.get("feishu_news"), f"[推特: {usr}]", f"推文内容: {tweet_text}", date, url)
             asyncio.run(sendMarkdownMsgNoImage(mess))
+            x_type = CONFIG.get('X_news').get('x_type')
+            x_mq_name = CONFIG.get('X_news').get('x_mq_name')
+            x_Qkey = CONFIG.get('X_news').get('x_Qkey')
+            message_body = MessageBody(
+                msg_type=x_type,
+                title=f"[推特: {usr}]",
+                content=tweet_text,
+                QKey=x_Qkey,
+                links=url,
+                create_time=date
+            )
+            mq.publish_message(x_mq_name, message_body.to_json())
             if image_urls:
                 print("图片URL:")
                 for url in image_urls:
@@ -128,7 +152,6 @@ def crash_new(url, twitter_user, content_queue, count):
             save_dir = os.path.join('image/', uuid)
             if image_urls:
                 download_images(image_urls, save_dir)
-            content_queue.enqueue(uuid)
             if count == 0:
                 return tweet_text, date, image_urls, uuid
     except NoSuchWindowException:
@@ -145,6 +168,13 @@ def dingtalk5(msg, webhook5=DD_webhook5_J, secret5=DD_secret5_J):
     xiaoding5 = DingtalkChatbot(webhook5, secret=secret5)  # 方式二：勾选“加签”选项时使用（v1.5以上新功能）
     xiaoding5.send_text(msg=msg)
 
+def load_config(config_path):
+    with open(config_path, 'r') as file:
+        config = json.load(file)
+    return config
+
+CONFIG = load_config('./user_config/config.json')
+
 if __name__ == "__main__":
     # 初始化
     chrome_options = ChromeOptions()
@@ -155,6 +185,7 @@ if __name__ == "__main__":
     driver = webdriver.Chrome(options=chrome_options)
     driver.set_page_load_timeout(5)
     string_list = []
+    my_mq = MQ_init_From_Config(CONFIG)
 
     try:
         driver.get("https://twitter.com/i/flow/login")
@@ -173,6 +204,7 @@ if __name__ == "__main__":
     print("访问推特页面中.....")
     # 第一次爬取时，只需要爬一条消息
     count = 0
+    currentTime = datetime.now().replace(tzinfo=pytz.UTC).astimezone(pytz.timezone("Asia/Shanghai"))
     while True:
         try:
             with open("./twitterUrl.txt", "r", encoding="utf-8") as file:
@@ -193,7 +225,7 @@ if __name__ == "__main__":
                             continue
 
                         twitter_user = name[0].text
-                        tweet_text, date, image_urls, uuid = crash_new(line, twitter_user, content_queue, count)
+                        tweet_text, date, image_urls, uuid = crash_new(line, twitter_user, content_queue, count, my_mq, currentTime)
                         time.sleep(15)
                         if date == '-1':
                             continue
@@ -215,4 +247,4 @@ if __name__ == "__main__":
         except BaseException as error:
             print("open file has a error, ", str(error))
         count = 1
-        time.sleep(500)
+        time.sleep(300)

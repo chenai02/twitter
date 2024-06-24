@@ -84,8 +84,19 @@ def consumer_callback(ch, method, properties, body):
     print('消费者收到:{}'.format(json_dict), type(json_dict))
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
+
+def MQ_init_From_Config(CONFIG):
+    mq_host = CONFIG.get('myMQ').get('host')
+    mq_port = CONFIG.get('myMQ').get('port')
+    mq_username = CONFIG.get('myMQ').get('username')
+    mq_password = CONFIG.get('myMQ').get('password')
+    mq_retry_count = CONFIG.get('myMQ').get('retry_count')
+    myMQ = RabbitMQProducer(mq_host, mq_port, mq_username,mq_password, mq_retry_count)
+    return myMQ
+
+
 if __name__ == "__main__":
-    myMQ = RabbitMQProducer('120.24.193.184', 5672, 'rain','rain@123', 5)
+    myMQ = RabbitMQProducer('xxxxx', 5672, 'rain','rain@123', 5)
     # myMQ.consume_messages('rain_mq', consumer_callback)
     while True:
         try:
