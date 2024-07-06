@@ -2,6 +2,9 @@ import json, os, sys
 import aiohttp
 import asyncio
 import aiofiles
+
+from src.BaseData.BaseData import MessageData
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 
