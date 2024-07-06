@@ -1,6 +1,6 @@
 import requests, time, json, random
 from collections import deque
-
+from loguru import logger
 class FixedSizeQueue:
     def __init__(self, max_size):
         self.max_size = max_size
@@ -43,7 +43,7 @@ class FixedSizeQueue:
     def printQ(self):
         """以更易读的方式打印队列中的所有元素。"""
         for index, item in enumerate(self.queue):
-            print(f"Item {index}: {item}")
+            logger.info(f"Item {index}: {item}")
 
 def sendMes(URL, message,debug = 0):
     if debug == 1:

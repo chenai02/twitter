@@ -81,7 +81,7 @@ class RabbitMQProducer:
 def consumer_callback(ch, method, properties, body):
     json_str = body.decode('utf-8')
     json_dict = json.loads(json_str)
-    print('消费者收到:{}'.format(json_dict), type(json_dict))
+    logger.info('消费者收到:{}'.format(json_dict), type(json_dict))
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
