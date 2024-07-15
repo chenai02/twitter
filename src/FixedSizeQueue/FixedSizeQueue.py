@@ -1,4 +1,5 @@
 from collections import deque
+from loguru import logger
 class FixedSizeQueue:
     def __init__(self, max_size, remove_on_full=True):
         self.max_size = max_size
@@ -38,7 +39,7 @@ class FixedSizeQueue:
     def printQ(self, debug=False):
         if debug:
             for index, item in enumerate(self.queue):
-                print(f"Item {index}: {item}")
+                logger.info(f"Item {index}: {item}")
 
 if __name__ == '__main__':
     q = FixedSizeQueue(max_size=10)
@@ -47,4 +48,3 @@ if __name__ == '__main__':
     if q.contains("SpaceX_2024-06-25 06:38:01"):
         print("Found")
     q.printQ(debug=True)
-

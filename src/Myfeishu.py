@@ -2,6 +2,9 @@ import json, os, sys
 import aiohttp
 import asyncio
 import aiofiles
+from loguru import logger
+from src.BaseData.BaseData import MessageData
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 
@@ -29,7 +32,7 @@ async def get_token(app_id, app_secret):
 async def uploadImage(app_id, app_secret, image, retries=3):
     token = await get_token(app_id, app_secret)
     if retries < 0:
-        print("Max retries exceeded.")
+        logger.info("Max retries exceeded.")
         return None
 
     url = "https://open.feishu.cn/open-apis/im/v1/images"
