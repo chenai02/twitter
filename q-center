@@ -10,8 +10,16 @@ id     result   	keyword
 492    true     ["运动控制产品", "PCB"]
 491    true     ["物奇微电子", "芯片"]
 490    true     ["储能", "光伏"]
-499    fase
-498    true     ["投资者关系", "国有资产"]
+489    fase
+488    true     ["投资者关系", "国有资产"]
+487    {"result": True, "keyword": ["万科", "信用等级"]}
+486    {"result": True, "keyword": ["工业大麻", "医用 CBD"]}
+485    {"result": True, "keyword": ["eVTOL", "力翎航空"]}
+484    {"result": False, "keyword": []}
+483    {"result": True, "keyword": ["经颅磁", "龙之杰"]}
+482    {"result": False, "keyword": []}
+481    {"result": True, "keyword": ["SafeGPT", "驾驶安全"]}
+480    {"result": True, "keyword": ["智能测绘", "数字孪生水利"]}
 
 
 
