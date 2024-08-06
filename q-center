@@ -20,7 +20,8 @@ id     result   	keyword
 482    {"result": False, "keyword": []}
 481    {"result": True, "keyword": ["SafeGPT", "驾驶安全"]}
 480    {"result": True, "keyword": ["智能测绘", "数字孪生水利"]}
-
+479    {"result": True, "keyword": ["农药制剂", "原药"]}
+478    {"result": False, "keyword": []}
 
 
 
